@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mgraph04-raytracer-gpu", "mgraph04-raytracer-gpu.vcxproj", "{20C54C12-0309-4946-9460-BD41FE74315F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A212A52D-D3DF-4532-9877-C99142F6D7F0} = {A212A52D-D3DF-4532-9877-C99142F6D7F0}
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892} = {E815CBB3-4DF1-4784-AA42-99960FBEB892}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GLUS", "3rdparty\GLUS\GLUS.vcxproj", "{A212A52D-D3DF-4532-9877-C99142F6D7F0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892} = {E815CBB3-4DF1-4784-AA42-99960FBEB892}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glew", "3rdparty\glew\glew.vcxproj", "{E815CBB3-4DF1-4784-AA42-99960FBEB892}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{20C54C12-0309-4946-9460-BD41FE74315F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{20C54C12-0309-4946-9460-BD41FE74315F}.Debug|Win32.Build.0 = Debug|Win32
+		{20C54C12-0309-4946-9460-BD41FE74315F}.Release|Win32.ActiveCfg = Release|Win32
+		{20C54C12-0309-4946-9460-BD41FE74315F}.Release|Win32.Build.0 = Release|Win32
+		{A212A52D-D3DF-4532-9877-C99142F6D7F0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A212A52D-D3DF-4532-9877-C99142F6D7F0}.Debug|Win32.Build.0 = Debug|Win32
+		{A212A52D-D3DF-4532-9877-C99142F6D7F0}.Release|Win32.ActiveCfg = Release|Win32
+		{A212A52D-D3DF-4532-9877-C99142F6D7F0}.Release|Win32.Build.0 = Release|Win32
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892}.Debug|Win32.Build.0 = Debug|Win32
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892}.Release|Win32.ActiveCfg = Release|Win32
+		{E815CBB3-4DF1-4784-AA42-99960FBEB892}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
