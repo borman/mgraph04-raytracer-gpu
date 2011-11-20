@@ -37,8 +37,8 @@ FullScreenQuad* g_pFullScreenQuad = NULL;
 int g_width  = 0;
 int g_height = 0;
 
-float3 g_boxMin(-10,-10,-10);
-float3 g_boxMax(10,10,10);
+float3 g_boxMin(-7,-7,-7);
+float3 g_boxMax(7,7,7);
 float3 g_camPos(0,0,15);
 
 void RequreExtentions()
@@ -189,7 +189,7 @@ GLUSboolean update(GLUSfloat time)
 
     lightPos.x = 10*sin(0.05f*elaspedTimeFromStart);
     lightPos.y = 10*cos(0.05f*elaspedTimeFromStart);
-    lightPos.z = 10*sin(0.05f*elaspedTimeFromStart);
+    lightPos.z = 7 + 2*sin(0.05f*elaspedTimeFromStart);
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClearDepth(1.0f);
@@ -210,6 +210,8 @@ GLUSboolean update(GLUSfloat time)
     setUniform(g_program.program, "g_bBoxMax",  g_boxMax);
  
     setUniform(g_program.program, "g_bgColor",  float4(0,0,1,0));
+    setUniform(g_program.program, "g_lightPos",  lightPos);
+    setUniform(g_program.program, "g_time",  elaspedTimeFromStart);
    
     
     // Calc ray matrix. You should notice that rayMatrix is actually inverse of worldMatrix. 

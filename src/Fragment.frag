@@ -23,30 +23,104 @@ uniform float3 g_lightPos;
 uniform float4x4 g_rayMatrix;
 uniform float4 g_bgColor;
 
-float DistanceField(float3 p)
+uniform float g_time;
+
+//===========================================================
+
+float metaball(float3 p)
 {
-  return min(length(p - float3(0, 0, 1)) - 1, p.z);
+  return pow(dot(p, p), 1.5);
 }
 
-bool RayMarchHit(float3 pos, float3 dir, float tmin, float tmax, out float3 hit)
+float maxcomp(float3 p)
 {
-	float t  = tmin;
-	
-	float3 color = float3(0,0,0);
-	
+  return max(p.x, max(p.y, p.z));
+}
+
+float sdBox(float3 p, float3 b)
+{
+  vec3 di = abs(p) - b;
+  float mc = maxcomp(di);
+  return min(mc, length(max(di, 0.0)));
+}
+
+float DistanceField(float3 p)
+{
+  float s1 = metaball(p - float3(0, 0, 1));
+  float s2 = metaball(p - float3(0, 3.5, 1));
+  float s3 = metaball(p - float3(3.5, 0, 1));
+  //float s3 = pow(sdBox(p - float3(3.5, 0, 1), float3(1, 1, 1)), 2);
+  float s4 = metaball(p - float3(0, 0, 4.5 + 2*sin(0.1 * g_time)));
+  //float s4 = pow(sdBox(p - float3(0, 0, 4.5 + 2*sin(0.1 * g_time)), float3(1, 1, 1)), 3);
+  float s12 = pow(1/(1/s1 + 1/s2 + 1/s3 + 1/s4), 0.333) - 1.5;
+  //float s12 = min(s1, s2);
+  return min(p.z, s12);
+}
+
+float3 NormalField(float3 p)
+{
+  float eps = 1e-4;
+  float3 dx = float3(eps, 0, 0);
+  float3 dy = float3(0, eps, 0);
+  float3 dz = float3(0, 0, eps);
+
+  return normalize(float3(DistanceField(p+dx) - DistanceField(p-dx),
+                          DistanceField(p+dy) - DistanceField(p-dy),
+                          DistanceField(p+dz) - DistanceField(p-dz)));
+}
+
+//===========================================================
+
+float RayMarchShadow(float3 pos, float3 dir, float tmin, float tmax)
+{
+  float kSmooth = 5;
+	float t = tmin;
+  float dens = 1.0f;
 	while(t < tmax)
 	{
 	  float3 p = pos + t*dir;
     float dt = DistanceField(p);
-    if (dt < 1e-5f)
-    {
-      hit = p;
-      return true;
-    }
-	  t += dt;
+    if (dt < 1e-4f)
+      return 0.0f;
+    dens = min(dens, kSmooth*dt/t);
+	  t += max(1e-4, dt);
 	}
-	
+	return dens;
+}
+
+bool RayMarchHit(float3 pos, float3 dir, float tmin, float tmax, out float3 hit)
+{
+	float t = tmin;	
+	while(t < tmax)
+	{
+	  hit = pos + t*dir;
+    float dt = DistanceField(hit);
+    if (dt < 1e-4f)
+      return true;
+	  t += max(1e-4, dt);
+	}
 	return false;
+}
+
+float AmbientOcclusion(float3 p, float3 n)
+{
+  float delta = 0.1f;
+  float blend = 1.0f;
+  int iter = 10;
+
+  float ao = 0;
+  for (int i=iter; i>0; i--)
+    ao = ao/2 + max(0.0f, i*delta - DistanceField(p + i*delta*n));
+
+  return 1 - blend*ao;
+}
+
+float Shade(float3 pos, float3 norm, float3 eye, float3 light)
+{
+  float3 toLight = normalize(light - pos);
+  float blinn = max(0, pow(dot(norm, normalize(eye+toLight)), 1000));
+  float lambert = max(0, dot(toLight, norm));
+  return (blinn + lambert) * RayMarchShadow(pos, toLight, 1e-2, distance(light, pos));
 }
 
 float4 Render(float3 pos, float3 dir)
@@ -54,13 +128,17 @@ float4 Render(float3 pos, float3 dir)
   float3 hit;
   if (RayMarchHit(pos, dir, 1e-2, 1e2, hit))
   {
-    float z = distance(pos, hit);
-    float3 color = 0.1*log2(float3(z, z, z));
+    float3 norm = NormalField(hit);
+    float3 ambient = AmbientOcclusion(hit, norm) * float3(0.3, 0.3, 0.3);
+    float3 shade = Shade(hit, norm, -dir, g_lightPos) * float3(1.0, 1.0, 1.0);
+    float3 color = ambient + 0.2*shade;
     return float4(color.r, color.g, color.b, 1.0f);
   }
   else
     return float4(0, 0, 0, 0);
 }
+
+//===========================================================
 
 bool RayBoxIntersection(float3 ray_pos, float3 ray_dir, float3 boxMin, float3 boxMax, out float tmin, out float tmax)
 {
