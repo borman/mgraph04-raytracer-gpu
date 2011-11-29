@@ -39,7 +39,8 @@ int g_height = 0;
 
 float3 g_boxMin(-7,-7,-7);
 float3 g_boxMax(7,7,7);
-float3 g_camPos(0,0,15);
+float3 g_camPos(0,0,25);
+float3 g_camLookAtPos(0,0,5);
 
 void RequreExtentions()
 {
@@ -189,7 +190,7 @@ GLUSboolean update(GLUSfloat time)
 
     lightPos.x = 10*sin(0.05f*elaspedTimeFromStart);
     lightPos.y = 10*cos(0.05f*elaspedTimeFromStart);
-    lightPos.z = 7 + 2*sin(0.05f*elaspedTimeFromStart);
+    lightPos.z = 12 + 2*sin(0.05f*elaspedTimeFromStart);
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClearDepth(1.0f);
@@ -210,7 +211,7 @@ GLUSboolean update(GLUSfloat time)
     setUniform(g_program.program, "g_bBoxMax",  g_boxMax);
  
     setUniform(g_program.program, "g_bgColor",  float4(0,0,1,0));
-    setUniform(g_program.program, "g_lightPos",  lightPos);
+    setUniform(g_program.program, "g_lights[0].pos",  lightPos);
     setUniform(g_program.program, "g_time",  elaspedTimeFromStart);
    
     
@@ -223,7 +224,7 @@ GLUSboolean update(GLUSfloat time)
 
     glusLoadIdentityf(camRotMatrix.L());
     glusLoadIdentityf(camTransMatrix.L());
-    glusRotateRzRyRxf(camRotMatrix.L(), -input.cam_rot[0], -input.cam_rot[1], 0.0f);
+    glusRotateRzRyRxf(camRotMatrix.L(), -input.cam_rot[0], 0.0f, -input.cam_rot[1]);
     glusTranslatef(camTransMatrix.L(), g_camPos.x, g_camPos.y, g_camPos.z);
     glusMultMatrixf(rayMatrix.L(), camRotMatrix.L(), camTransMatrix.L());
     setUniform(g_program.program, "g_rayMatrix", rayMatrix);
