@@ -57,9 +57,8 @@ uniform Light g_lights[] = {
   ),
 };
 
-//===========================================================
-
 uniform Material g_mats[] = {
+  // Ground
   Material(
     float3(0.4, 0.4, 0.4), // Ambient
     float3(1.0, 1.0, 1.0), // Diffuse
@@ -68,6 +67,7 @@ uniform Material g_mats[] = {
     1.0, // kRefraction
     float3(0.0, 0.0, 0.0) // Glow
   ),
+  // Balls
   Material(
     float3(0.4, 0.1, 0.1), // Ambient
     float3(1.0, 0.1, 0.6), // Diffuse
@@ -75,9 +75,19 @@ uniform Material g_mats[] = {
     1000, // Shininess
     0.7, // kRefraction
     float3(1.0, 1.0, 1.0) // Glow
+  ),
+  // Tiles
+  Material(
+    float3(0.1, 0.4, 0.1), // Ambient
+    float3(0.6, 1.0, 0.1), // Diffuse
+    float3(1.0, 1.0, 1.0), // Specular
+    1000, // Shininess
+    1.0, // kRefraction
+    float3(0.0, 0.0, 0.0) // Glow
   )
 };
 
+uniform float4 g_fogColor = float4(0.95, 0.95, 1.0, 1.0);
 
 //===========================================================
 
@@ -136,7 +146,7 @@ int MaterialId(float3 p)
   if (ObjectBalls(p) < 1e-2)
     return 1;
   if (ObjectTiles(p) < 1e-2)
-    return 1;
+    return 2;
   return 0;
 }
 
@@ -162,26 +172,33 @@ float4 EnvColor(float3 dir)
 
 //===========================================================
 
-bool RayMarch(float3 pos, float3 dir, float tmin, float tmax, out float3 hit, out float prox)
+bool RayMarch(float3 pos, float3 dir, float zmin, float zmax, 
+              out float3 hit, out float z, out float prox, out int steps)
 {
-  const float minStep = 1e-5;
-  const float maxStepK = 1e-2;
-  const float eps = 1e-5;
-	float t = tmin;
-  int steps = 10000;
+  const float minStepK = 1e-5;
+  const float maxStepBase = 1e-2;
+  const float maxStepK = 1; // Proportional to z
+  const float epsK = 1e-5; // Proportional to z
+  const float maxSteps = 1000;
+
+	z = zmin;
+  steps = 0;
   prox = 1e38f;
-	while(steps-- > 0 && t < tmax)
+	while(++steps < maxSteps && z < zmax)
 	{
-	  hit = pos + t*dir;
-    float dt = DistanceField(hit);
-    if (dt < eps*t) // Adaptive threshold => fix artefacts on objects far away
+	  hit = pos + z*dir;
+    float dz = DistanceField(hit);
+    if (dz < epsK*z) // Adaptive threshold => fix artefacts on objects far away, speedup possible
     {
-      prox = 0.0f;
+      prox = 0;
       return true;
     }
-	  t += clamp(dt, minStep, 1e-1 + maxStepK*t);
-    prox = min(prox, dt/t);
+	  z += clamp(dz, minStepK*z, maxStepBase + maxStepK*z);
+    prox = min(prox, dz/z);
 	}
+  // Miss
+  z = zmax;
+  hit = pos + z*dir;
 	return false;
 }
 
@@ -228,25 +245,40 @@ float Fresnel(float k, float3 norm, float3 toEye)
 float Illumination(float3 pos, int id)
 {
   float3 _hit;
+  float _z;
+  int _steps;
   float prox;
   float dist = distance(g_lights[id].pos, pos); // Distance
-  if (RayMarch(pos, normalize(g_lights[id].pos-pos), 0, dist, _hit, prox)) // Shadow
+  if (RayMarch(pos, normalize(g_lights[id].pos-pos), 0, dist, _hit, _z, prox, _steps)) // Shadow
     return 0;
   float att = dot(g_lights[id].att, float3(1, dist, dist*dist)); // Attenuation
   return min(1.0, 5*prox)/att;
 }
 
+float Fog(float z)
+{
+  const float density = 0.0001;
+  return clamp(1-exp(-density * z*z), 0, 1);
+}
 
 float4 Render(float3 pos, float3 dir, float tmin, float tmax)
 {
   float3 hit;
   float _prox;
-  if (RayMarch(pos, dir, tmin, tmax, hit, _prox))
+  float z;
+  int steps;
+  bool isHit = RayMarch(pos, dir, tmin, tmax, hit, z, _prox, steps);
+  float fog = Fog(length((pos-hit).xy));
+
+  float4 resColor;
+  if (isHit)
   {
+    //return float4(float3(fog), 1.0);
     float3 norm = NormalField(hit);
     float3 toEye = -dir;
     int matId = MaterialId(hit);
     float fresnel = Fresnel(g_mats[matId].kRefr, norm, toEye);
+
     float3 color = g_mats[matId].ambient * AmbientOcclusion(hit, norm); // Ambient
     color += g_mats[matId].glow * fresnel; // Glow
 
@@ -262,10 +294,12 @@ float4 Render(float3 pos, float3 dir, float tmin, float tmax)
       }
     }
    
-    return float4(color, 1);
+    resColor = float4(color, 1);
   }
   else
-    return EnvColor(dir);
+    resColor = EnvColor(dir);
+
+  return mix(resColor, g_fogColor, fog);
 }
 
 //===========================================================
