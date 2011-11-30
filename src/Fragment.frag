@@ -51,9 +51,9 @@ uniform Light g_lights[] = {
     float3(3.0, 0.0, 0.001) // Attenuation
   ),
   Light(
-    float3(5.0, 5.0, 7.0), // Position
-    float3(0.2, 1.0, 0.2), // Color
-    float3(2.0, 0.0, 0.01) // Attenuation
+    float3(8.0, 8.0, 7.0), // Position
+    float3(0.2, 0.2, 1.0), // Color
+    float3(1.0, 0.0, 0.001) // Attenuation
   ),
 };
 
@@ -103,6 +103,12 @@ float sdBox(float3 p, float3 b)
   return min(mc, length(max(di, 0.0)));
 }
 
+float sdTorus(float3 p, float2 t)
+{
+  float2 q = float2(length(p.xy)-t.x,p.z);
+  return length(q)-t.y;
+}
+
 float mball(float k, float3 p)
 {
   return pow(dot(p, p), -k/2);
@@ -120,11 +126,14 @@ float ObjectBalls(float3 p)
   */
 
   //float vheight = 4.5 + 4*sin(0.1 * g_time);
-  const float vheight = 4.5;
-  float mballs = mball(tension, p - float3(-1.1, -1.1, 1))
+  const float vheight = 11;
+  float mballs = mball(tension, p - float3(-1.1, -1.1, vheight*0.5))
                + mball(tension, p - float3(0, 2.5, vheight*0.33))
                + mball(tension, p - float3(2.5, 0, vheight*0.66))
-               + mball(tension, p - float3(0, 0, vheight));
+               + mball(tension, p - float3(0, 0, vheight))
+               + pow(sdTorus(p-float3(0,0,7), float2(6, -1.1)), -tension)
+               + pow(sdTorus((p-float3(0,0,7)).xzy, float2(6, -1.1)), -tension)
+               + pow(sdTorus((p-float3(0,0,7)).yzx, float2(6, -1.1)), -tension);
   return pow(mballs, -1/tension) - 1.5;
 }
 
@@ -133,7 +142,8 @@ float ObjectTiles(float3 p)
   float2 i;
   const float cellSize = 16;
   p.xy = modf(abs(p.xy)/cellSize, i)*cellSize - float2(8, 8);
-  return sdBox(p, float3(1, 1, 1));
+  //return sdBox(p, float3(1, 1, 1));
+  return sdTorus(p - float3(0,0,3*length(sin(i))), float2(3, 0.7));
 }
 
 float DistanceField(float3 p)
@@ -175,9 +185,9 @@ float4 EnvColor(float3 dir)
 bool RayMarch(float3 pos, float3 dir, float zmin, float zmax, 
               out float3 hit, out float z, out float prox, out int steps)
 {
-  const float minStepK = 1e-5;
-  const float maxStepBase = 1e-2;
-  const float maxStepK = 1; // Proportional to z
+  const float minStepK = 1e-6;
+  const float maxStepBase = 1e-3;
+  const float maxStepK = 5e-2; // Proportional to z
   const float epsK = 1e-5; // Proportional to z
   const float maxSteps = 1000;
 
@@ -269,11 +279,12 @@ float4 Render(float3 pos, float3 dir, float tmin, float tmax)
   int steps;
   bool isHit = RayMarch(pos, dir, tmin, tmax, hit, z, _prox, steps);
   float fog = Fog(length((pos-hit).xy));
+  if (fog > 0.999)
+    return g_fogColor;
 
   float4 resColor;
   if (isHit)
   {
-    //return float4(float3(fog), 1.0);
     float3 norm = NormalField(hit);
     float3 toEye = -dir;
     int matId = MaterialId(hit);
@@ -351,6 +362,7 @@ void main(void)
   float2 xy = fragmentTexCoord * wh; // Pixel coords
 
   fragColor = Sample(xy, wh);
+
   /*
   // 4x supersampling
   float2 dx = 0.5*float2(1,0);
