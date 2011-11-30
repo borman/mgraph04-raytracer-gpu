@@ -14,6 +14,9 @@ struct Material
   float3 diffuse;
   float3 specular;
   float shininess;
+
+  float kRefr;
+  float3 glow;
 };
 
 struct Light
@@ -60,14 +63,18 @@ uniform Material g_mats[] = {
   Material(
     float3(0.4, 0.4, 0.4), // Ambient
     float3(1.0, 1.0, 1.0), // Diffuse
-    float3(1.0, 1.0, 1.0), // Specular
-    1000 // Shininess
+    float3(0.0, 0.0, 0.0), // Specular
+    10, // Shininess
+    1.0, // kRefraction
+    float3(0.0, 0.0, 0.0) // Glow
   ),
   Material(
-    float3(0.4, 0.4, 0.4), // Ambient
-    float3(1.0, 1.0, 1.0), // Diffuse
+    float3(0.4, 0.1, 0.1), // Ambient
+    float3(1.0, 0.1, 0.6), // Diffuse
     float3(1.0, 1.0, 1.0), // Specular
-    1000 // Shininess
+    1000, // Shininess
+    0.7, // kRefraction
+    float3(1.0, 1.0, 1.0) // Glow
   )
 };
 
@@ -102,7 +109,8 @@ float ObjectBalls(float3 p)
   float shift = length(i);
   */
 
-  float vheight = 4.5 + 4*sin(0.1 * g_time);
+  //float vheight = 4.5 + 4*sin(0.1 * g_time);
+  const float vheight = 4.5;
   float mballs = mball(tension, p - float3(-1.1, -1.1, 1))
                + mball(tension, p - float3(0, 2.5, vheight*0.33))
                + mball(tension, p - float3(2.5, 0, vheight*0.66))
@@ -110,9 +118,26 @@ float ObjectBalls(float3 p)
   return pow(mballs, -1/tension) - 1.5;
 }
 
+float ObjectTiles(float3 p)
+{
+  float2 i;
+  const float cellSize = 16;
+  p.xy = modf(abs(p.xy)/cellSize, i)*cellSize - float2(8, 8);
+  return sdBox(p, float3(1, 1, 1));
+}
+
 float DistanceField(float3 p)
 {
-  return min(p.z, ObjectBalls(p));
+  return min(p.z, min(ObjectBalls(p), ObjectTiles(p)));
+}
+
+int MaterialId(float3 p)
+{
+  if (ObjectBalls(p) < 1e-2)
+    return 1;
+  if (ObjectTiles(p) < 1e-2)
+    return 1;
+  return 0;
 }
 
 float3 NormalField(float3 p)
@@ -163,7 +188,7 @@ bool RayMarch(float3 pos, float3 dir, float tmin, float tmax, out float3 hit, ou
 float AmbientOcclusion(float3 p, float3 n)
 {
   float delta = 0.1f;
-  float blend = 1.0f;
+  float blend = 0.8f;
   int iter = 10;
 
   float ao = 0;
@@ -185,6 +210,21 @@ float Specular(int matId, float3 norm, float3 toEye, float3 toLight)
   return pow(max(0, dot(norm, normalize(toEye+toLight))), g_mats[matId].shininess);
 }
 
+float Fresnel(float k, float3 norm, float3 toEye)
+{
+  float cos1 = dot(norm, toEye);
+  float cos2s = 1 - k*k*(1 - cos1*cos1);
+  if (cos2s < 0)
+    return 1;
+  else
+  {
+    float cos2 = sqrt(cos2s);
+    float a = (k*cos1 - cos2) / (k*cos1 + cos2);
+    float b = (k*cos2 - cos1) / (k*cos2 + cos1);
+    return (a*a + b*b)/2;
+  }
+}
+
 float Illumination(float3 pos, int id)
 {
   float3 _hit;
@@ -204,19 +244,20 @@ float4 Render(float3 pos, float3 dir, float tmin, float tmax)
   if (RayMarch(pos, dir, tmin, tmax, hit, _prox))
   {
     float3 norm = NormalField(hit);
-    int matId = 0;
-    float3 color = float3(0,0,0);
-    color += g_mats[matId].ambient * AmbientOcclusion(hit, norm);
-
     float3 toEye = -dir;
+    int matId = MaterialId(hit);
+    float fresnel = Fresnel(g_mats[matId].kRefr, norm, toEye);
+    float3 color = g_mats[matId].ambient * AmbientOcclusion(hit, norm); // Ambient
+    color += g_mats[matId].glow * fresnel; // Glow
+
     for (int i=0; i<g_lights.length(); ++i)
     {
       float3 toLight = normalize(g_lights[i].pos - hit);
       float illum = Illumination(hit + 1e-2*norm, i);
       if (illum > 1e-5)
       {
-        float3 shade = g_mats[matId].diffuse * Diffuse(matId, norm, toLight);
-        shade += g_mats[matId].specular * Specular(matId, norm, toEye, toLight);
+        float3 shade = g_mats[matId].diffuse * Diffuse(matId, norm, toLight); // Diffuse
+        shade += g_mats[matId].specular * Specular(matId, norm, toEye, toLight); // Specular
         color += illum * g_lights[i].color * shade;
       }
     }
@@ -256,11 +297,8 @@ float3 Project(float2 xy, float2 wh)
   return normalize(ray_dir);
 }
 
-void main(void)
-{	
-  float2 wh = float2(g_screenWidth, g_screenHeight); // Screen size
-  float2 xy = fragmentTexCoord * wh; // Pixel coords
-
+float4 Sample(float2 xy, float2 wh)
+{
   // Ray: from (0,0,0); screen parallel to xy plane
   float3 ray_pos = float3(0,0,0); 
   float3 ray_dir = Project(xy, wh);
@@ -270,8 +308,21 @@ void main(void)
   ray_pos = (g_rayMatrix*float4(ray_pos,1)).xyz;
   ray_dir = float3x3(g_rayMatrix)*ray_dir;
 
+  return Render(ray_pos, ray_dir, 0, 1e3);
+}
 
-  fragColor = Render(ray_pos, ray_dir, 0, 1e4);
+void main(void)
+{	
+  float2 wh = float2(g_screenWidth, g_screenHeight); // Screen size
+  float2 xy = fragmentTexCoord * wh; // Pixel coords
+
+  fragColor = Sample(xy, wh);
+  /*
+  // 4x supersampling
+  float2 dx = 0.5*float2(1,0);
+  float2 dy = 0.5*float2(0,1);
+  fragColor = 0.25 * (Sample(xy, wh) + Sample(xy+dx, wh) + Sample(xy+dy, wh) + Sample(xy+dx+dy, wh));
+  */
 
   /*
   // intersect bounding box of the whole scene, if no intersection found return background color
