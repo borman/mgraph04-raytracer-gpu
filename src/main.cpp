@@ -67,8 +67,8 @@ GLUSboolean init(GLUSvoid)
     // Load the source of the vertex shader. GLUS loader corrupts shaders.
     // Thats why we do that manually.
     //
-    std::ifstream vertSourceFile("../src/Vertex.vert");
-    std::ifstream fragSourceFile("../src/Fragment.frag");
+    std::ifstream vertSourceFile("Vertex.vert");
+    std::ifstream fragSourceFile("Fragment.frag");
 
     std::string fragSource;
     std::string vertSource;
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
 
 	glusPrepareContext(3, 3, GLUS_FORWARD_COMPATIBLE_BIT);
 
-	if (!glusCreateWindow("Fractal RT", 640, 480, GLUS_FALSE))
+	if (!glusCreateWindow("RayTracer", 640, 480, GLUS_FALSE))
 	{
 		printf("Could not create window!");
 		return -1;

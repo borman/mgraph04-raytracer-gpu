@@ -126,12 +126,12 @@ float ObjectBalls(float3 p)
   */
 
   //float vheight = 4.5 + 4*sin(0.1 * g_time);
-  const float vheight = 11;
-  float mballs = mball(tension, p - float3(-1.1, -1.1, vheight*0.5))
-               + mball(tension, p - float3(0, 2.5, vheight*0.33))
-               + mball(tension, p - float3(2.5, 0, vheight*0.66))
-               + mball(tension, p - float3(0, 0, vheight))
-               + pow(sdTorus(p-float3(0,0,7), float2(6, -1.1)), -tension)
+  const float vheight = 13;
+  float mballs = /* mball(tension, p - float3(-1.1, -1.1, vheight*0.5))
+               + mball(tension, p - float3(1.1, -1.1, vheight*0.45))
+               + mball(tension, p - float3(1.1, 1.1, vheight*0.6))
+               + mball(tension, p - float3(-1.1, 1.1, vheight*0.7))
+               + */ pow(sdTorus(p-float3(0,0,7), float2(6, -1.1)), -tension)
                + pow(sdTorus((p-float3(0,0,7)).xzy, float2(6, -1.1)), -tension)
                + pow(sdTorus((p-float3(0,0,7)).yzx, float2(6, -1.1)), -tension);
   return pow(mballs, -1/tension) - 1.5;
@@ -143,7 +143,7 @@ float ObjectTiles(float3 p)
   const float cellSize = 16;
   p.xy = modf(abs(p.xy)/cellSize, i)*cellSize - float2(8, 8);
   //return sdBox(p, float3(1, 1, 1));
-  return sdTorus(p - float3(0,0,3*length(sin(i))), float2(3, 0.7));
+  return sdTorus(p - float3(0,0,1), float2(3, 0.7));
 }
 
 float DistanceField(float3 p)
